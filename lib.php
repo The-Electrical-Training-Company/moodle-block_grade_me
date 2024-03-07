@@ -247,7 +247,7 @@ function block_grade_me_cache_reset() {
 // Main cron function.
 function block_grade_me_cache_grade_data() {
     global $CFG, $DB;
-    $lastrun = $DB->get_field('task_scheduled', 'lastruntime', array('classname' => 'cache_grade_data'));
+    $lastrun = $DB->get_field('task_scheduled', 'lastruntime', array('classname' => '\block_grade_me\task\cache_grade_data'));
     $params = array();
     $params['itemtype'] = 'mod';
     $enabledplugins = array_keys(block_grade_me_enabled_plugins());
@@ -372,6 +372,10 @@ function block_grade_me_cache_grade_data() {
             // and that have active students in them.
             //
 
+            //
+            // We want to build the quiz table only when reseting the whole cache.
+
+            if ($coursemod == 0) {
             $sqlquizlist = "SELECT mq.id quizid, mqa.id quiattemptid, mqa.userid, mq.course, mqa.uniqueid,
                             qna.id questionattemptid
                             FROM {quiz} mq
@@ -421,6 +425,7 @@ function block_grade_me_cache_grade_data() {
                                       questionattemptstepid, courseid ) VALUES( ?, ?, ?, ?, ?)";
                         $paramsngrade = array($quizattemptid, $userid, $quizid, $questionstepid, $courseid);
                         $DB->execute($sqlngrade, $paramsngrade);
+                        }
                     }
                 }
             }

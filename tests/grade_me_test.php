@@ -52,9 +52,8 @@ class block_grade_me_testcase extends advanced_testcase {
      */
     protected function create_grade_me_data($file) {
         // Read the datafile and get the table names.
-        $dataset = $this->dataset_from_files([__DIR__ . '/fixtures/' . $file]);
-        $datasetrows = $dataset->get_rows();
-        $names = array_keys($datasetrows);
+        $dataset = $this->createXMLDataSet(__DIR__ . '/fixtures/' . $file);
+        $names = array_flip($dataset->getTableNames());
 
         // Generate Data.
         $generator = $this->getDataGenerator();
@@ -65,11 +64,12 @@ class block_grade_me_testcase extends advanced_testcase {
 
         $gradeables = array('assign', 'assignment', 'forum', 'glossary', 'quiz');
         foreach ($gradeables as $gradeable) {
-            if (in_array($gradeable, $names)) {
+            if (array_key_exists($gradeable, $names)) {
                 $pgen = $generator->get_plugin_generator("mod_{$gradeable}");
-                $gradeablerows = $datasetrows[$gradeable];
-                for ($row = 0; $row < count($gradeablerows); $row += 1) {
-                    $fields = $gradeablerows[$row];
+                $table = $dataset->getTable($gradeable);
+                $rows = $table->getRowCount();
+                for ($row = 0; $row < $rows; $row += 1) {
+                    $fields = $table->getRow($row);
                     unset($fields['id']);
                     $fields['course'] = $courses[$fields['course']]->id;
                     $instance = $pgen->create_instance($fields);
@@ -151,7 +151,7 @@ class block_grade_me_testcase extends advanced_testcase {
         foreach ($overrides as $field => $override) {
             foreach ($override['tables'] as $tablename) {
                 // Skip tables that aren't in the dataset.
-                if (in_array($tablename, $names)) {
+                if (array_key_exists($tablename, $names)) {
                     if (!array_key_exists($tablename, $tables)) {
                         $tables[$tablename] = array($field => array());
                     }
@@ -162,31 +162,26 @@ class block_grade_me_testcase extends advanced_testcase {
 
         // Perform the overrides.
         foreach ($tables as $tablename => $translations) {
+            $table = $dataset->getTable($tablename);
+            $rows = $table->getRowCount();
             foreach ($translations as $column => $values) {
                 foreach ($values as $value) {
                     $list = $value['list'];
                     $field = $value['field'];
-                    $tablerows = $datasetrows[$tablename];
-                    for ($row = 0; $row < count($tablerows); $row += 1) {
-                        $index = $tablerows[$row][$column];
+                    for ($row = 0; $row < $rows; $row += 1) {
+                        $index = $table->getValue($row, $column);
                         if (isset(${$list}[$index])) {
-                            $datasetrows[$tablename][$row][$column] = ${$list}[$index]->$field;
+                            $table->setValue($row, $column, ${$list}[$index]->$field);
                         }
                     }
                 }
             }
         }
 
-        // Remove any empty tables (otherwise dataset_from_array breaks).
-        foreach (array_keys($datasetrows) as $tablename) {
-            if (empty($datasetrows[$tablename])) {
-                unset($datasetrows[$tablename]);
-            }
-        }
-
-        // Load back in the modified dataset and send to the db.
-        $finaldataset = $this->dataset_from_array($datasetrows);
-        $finaldataset->to_database();
+        // Load the data.
+        $filtered = new \PHPUnit\DbUnit\DataSet\Filter($dataset);
+        $filtered->addExcludeTables($excludes);
+        $this->loadDataSet($filtered);
 
         // Return the generated users and courses because the tests often need them for result calculations.
         return array($users, $courses, $plugins);
@@ -834,7 +829,7 @@ class block_grade_me_testcase extends advanced_testcase {
 
         foreach ($expectedvalues as $expected) {
             $match = str_replace('[user0]', $users[0]->id, $expected);
-            $this->assertMatchesRegularExpression($match, $content->text);
+            $this->assertRegExp($match, $content->text);
         }
     }
 
@@ -962,7 +957,7 @@ class block_grade_me_testcase extends advanced_testcase {
         foreach ($expectedvalues as $expected) {
             $match = str_replace('[user0]', $users[0]->id, $expected);
             $match = str_replace('[user1]', $users[1]->id, $match);
-            $this->assertMatchesRegularExpression($match, $content->text);
+            $this->assertRegExp($match, $content->text);
         }
     }
 
@@ -987,7 +982,7 @@ class block_grade_me_testcase extends advanced_testcase {
 
         $this->assertFalse(empty($gradeables), 'Expected results not found.');
         $actual = block_grade_me_tree($gradeables);
-        $this->assertMatchesRegularExpression('/mod\/forum\/discuss.php\?d=100\#p1/', $actual);
+        $this->assertRegExp('/mod\/forum\/discuss.php\?d=100\#p1/', $actual);
     }
 
     /**

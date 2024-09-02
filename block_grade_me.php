@@ -110,16 +110,45 @@ class block_grade_me extends block_base {
                         $rs = $DB->get_recordset_sql($query, $values);
 
                         foreach ($rs as $r) {
-                            if ($r->itemmodule == 'assign' && $r->maxattempts != '1') {
-                                /* Check to be sure its the most recent attempt being graded */
+                            // Check whether marker allocation is active for assign module and, if it is,
+                            // only show gradeable items that are assigned to the current user.
+                            if ($r->itemmodule == 'assign') {
                                 $iteminstance = $r->iteminstance;
                                 $userid = $r->userid;
                                 $attemptnumber = $r->attemptnumber;
-                                $sql = 'select MAX(attemptnumber) from {assign_submission} where assignment = ' . $iteminstance .
-                                       ' and userid = ' . $userid;
-                                $maxattempt = $DB->get_field_sql($sql);
-                                if ($maxattempt == $attemptnumber) {
-                                    $gradeables = block_grade_me_array($gradeables, $r);
+                                $markingsql = 'select markingallocation from {assign} where id = ' . $iteminstance;
+                                $allocatedmarking = $DB->get_field_sql($markingsql);
+                                // Check whether marker allocation is active for this assign instance.
+                                if ($allocatedmarking == 1) {
+                                    $markerid = $USER->id;
+                                    $markersql = 'select allocatedmarker from {assign_user_flags}
+                                        where assignment = ' . $iteminstance .
+                                        ' and userid = ' . $userid;
+                                    $allocatedmarkerid = $DB->get_field_sql($markersql);
+                                    // Check whether the user is the allocated marker, if they are, add item to
+                                    // gradeables. If not, ignore row.
+                                    if ($markerid == $allocatedmarkerid) {
+                                        /* Check to be sure its the most recent attempt being graded */
+                                        if ($r->maxattempts != '1') {
+                                            $sql = 'select MAX(attemptnumber) from {assign_submission}
+                                                where assignment = ' . $iteminstance .
+                                                ' and userid = ' . $userid;
+                                            $maxattempt = $DB->get_field_sql($sql);
+                                            if ($maxattempt == $attemptnumber) {
+                                                $gradeables = block_grade_me_array($gradeables, $r);
+                                            }
+                                        } else {
+                                            $gradeables = block_grade_me_array($gradeables, $r);
+                                        }
+                                    }
+                                } else if ($r->itemmodule == 'assign' && $r->maxattempts != '1') {
+                                    /* Check to be sure its the most recent attempt being graded */
+                                    $sql = 'select MAX(attemptnumber) from {assign_submission} where assignment = ' . $iteminstance .
+                                        ' and userid = ' . $userid;
+                                    $maxattempt = $DB->get_field_sql($sql);
+                                    if ($maxattempt == $attemptnumber) {
+                                        $gradeables = block_grade_me_array($gradeables, $r);
+                                    }
                                 }
                             } else {
                                 $gradeables = block_grade_me_array($gradeables, $r);

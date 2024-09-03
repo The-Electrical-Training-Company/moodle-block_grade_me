@@ -125,10 +125,10 @@ class block_grade_me extends block_base {
                                         where assignment = ' . $iteminstance .
                                         ' and userid = ' . $userid;
                                     $allocatedmarkerid = $DB->get_field_sql($markersql);
-                                    // Check whether the user is the allocated marker, if they are, add item to
-                                    // gradeables. If not, ignore row.
-                                    if ($markerid == $allocatedmarkerid) {
-                                        /* Check to be sure its the most recent attempt being graded */
+                                    // Check whether the user is the allocated marker or a manager,
+                                    // if they are, add item to gradeables. If not, ignore row.
+                                    if ($markerid == $allocatedmarkerid || has_capability("mod/assign:manageallocations", $context)) {
+                                        /* Check to be sure it's the most recent attempt being graded */
                                         if ($r->maxattempts != '1') {
                                             $sql = 'select MAX(attemptnumber) from {assign_submission}
                                                 where assignment = ' . $iteminstance .
@@ -142,7 +142,7 @@ class block_grade_me extends block_base {
                                         }
                                     }
                                 } else if ($r->itemmodule == 'assign' && $r->maxattempts != '1') {
-                                    /* Check to be sure its the most recent attempt being graded */
+                                    /* Check to be sure it's the most recent attempt being graded */
                                     $sql = 'select MAX(attemptnumber) from {assign_submission} where assignment = ' . $iteminstance .
                                         ' and userid = ' . $userid;
                                     $maxattempt = $DB->get_field_sql($sql);
